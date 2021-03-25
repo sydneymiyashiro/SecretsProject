@@ -35,10 +35,13 @@ mongoose.connect("mongodb://localhost:27017/userDB", {
     useCreateIndex: true
 });
 
+
+// User Collection
 const userSchema = new mongoose.Schema({
     email: String,
     password: String,
-    googleId: String
+    googleId: String,
+    secret: String
 });
 
 
@@ -95,7 +98,6 @@ app.get("/auth/google/secrets",
 });
 
 
-
 app.get("/login", function(req, res){
     res.render("login");
 });
@@ -108,7 +110,16 @@ app.get("/register", function(req, res){
 
 app.get("/secrets", function(req, res){
    if (req.isAuthenticated()) {
-       res.render("secrets");
+        // Render all non-null secrets
+        User.find({"secret": {$ne: null}}, function(err, foundUsers){
+            if (err) {
+                console.log(err);
+            } else {
+                if (foundUsers) {
+                    res.render("secrets", {usersWithSecrets: foundUsers});
+                }
+            }
+        });
    } else {
        res.redirect("/login");
    }
@@ -148,16 +159,41 @@ app.post("/login", function(req, res){
             console.log(err);
             res.redirect("/login");
         } else {
-            passport.authenticate("local")(req, res, function(){
+            passport.authenticate("local", {failureRedirect: "/"})(req, res, function(){
                 res.redirect("/secrets");
-            })
+            });
         }
     });
 });
 
 
+app.get("/submit", function(req, res){
+    if (req.isAuthenticated()) {
+        res.render("submit");
+    } else {
+        res.redirect("/login");
+    }
+});
 
 
+app.post("/submit", function(req, res){
+    // Add secret for the given user (1:1)
+    const newSecret = req.body.secret;
+
+    // Authenticated user details are saved to req.user
+    User.findById(req.user.id, function(err, foundUser){
+        if (err) {
+            console.log(err);
+        } else {
+            if (foundUser) {
+                foundUser.secret = newSecret;
+                foundUser.save(function(){
+                    res.redirect("/secrets");
+                });
+            }
+        }
+    });
+});
 
 
 
